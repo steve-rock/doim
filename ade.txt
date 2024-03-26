@@ -1,5 +1,6 @@
 {
   "unity_project_id": "sDgK6y9L0HLtPZZNaaJ3cq09Y8ZtCPN8rxksaf4SXto=",
   "unity_placement_small": "jnyTr0Nh1NBCw18naJr7LFjf3FIwdu+P6/I/9sY5MRQ=",
-  "applovin_event_key": "sDgK6y9L0HLtPZZNaaJ3cq09Y8ZtCPN8rxksaf4SXto="
+  "applovin_event_key": "sDgK6y9L0HLtPZZNaaJ3cq09Y8ZtCPN8rxksaf4SXto=",
+"applo_sdkisonid": "sDgK6y9L0HLtPZZNaaJ3cq09Y8ZtCPN8rxksaf4SXto="
 }

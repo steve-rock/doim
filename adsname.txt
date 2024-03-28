@@ -1,4 +1,4 @@
 {
   "applo_sdkisonid": "sDgK6y9L0HLtPZZNaaJ3cq09Y8ZtCPN8rxksaf4SXto=",
-  "applo_sdkiid": "4bd10bbcff4aabf9",
+  "applo_sdkiid": "4bd10bbcff4aabf9"
 }

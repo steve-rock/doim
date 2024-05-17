@@ -1,3 +1,28 @@
+// customize js
+const configuration = {
+  debug: true,
+  host: "https://movies.vulibs.work",
+  themoviedb_host: "https://api.themoviedb.org",
+  tmdbKey: "4d7bf7a313fd4192b96630ab86291705",
+  key: CryptoJS.enc.Utf8.parse("cb4b10abaadd1e422b15ff7586307842"),
+  iv: CryptoJS.enc.Utf8.parse("6f9bbc19f78f980f")
+};
+
+function environment() {
+  return {
+    en_hostImage500: `https://image.tmdb.org/t/p/w500`,
+    en_hostImage342: `https://image.tmdb.org/t/p/w342`,
+    en_hostImageOri: `https://image.tmdb.org/t/p/original`,
+    en_rest: `https://rest.opensubtitles.org`,
+    en_cantplay: `The link can't play`,
+    en_epiisplay: `This episode is playing`,
+    en_emptylink: `This movie doesn't have link to play yet`,
+    en_somethingwrong: `Something went wrong. Please select other server`,
+    en_epiFuture: `This episode is coming soon`,
+    en_moFuture: `This movie is coming soon`
+  }
+}
+
 window.onerror = function (err) {
   console.log('window.onerror: ' + err);
 }
@@ -11,18 +36,23 @@ function setupWKWebViewJavascriptBridge(callback) {
 
 setupWKWebViewJavascriptBridge(function (bridge) {
   bridge.registerHandler('a1', a1);
-  bridge.registerHandler('loadData', loadData);
+  bridge.registerHandler('m1', nowPlaying);
+  bridge.registerHandler('m2', movieTrending);
+  bridge.registerHandler('m3', movieDetail);
+  bridge.registerHandler('m4', movieSuggest);
+  bridge.registerHandler('m5', loadM);
+
+  bridge.registerHandler('t1', tvTrending);
+  bridge.registerHandler('t2', tvDetail);
+  bridge.registerHandler('t3', tvSuggest);
+  bridge.registerHandler('t4', tvSeason);
+  bridge.registerHandler('t5', loadT);
+
+  bridge.registerHandler('s1', trendingSearch);
+  bridge.registerHandler('s2', search);
+
+  bridge.registerHandler('ex1', externalId);
 })
-
-
-// customize js
-const configuration = {
-  debug: true,
-  host: "https://asian.vulibs.work",
-  tmdbKey: "4d7bf7a313fd4192b96630ab86291705",
-  key: CryptoJS.enc.Utf8.parse("ab4b10abaedd2e422b15ff7576307841"),
-  iv: CryptoJS.enc.Utf8.parse("5f8bbc19y78f960f")
-};
 
 // helper function
 function debug(data) {
@@ -42,15 +72,15 @@ function nowTimeStamp() {
 function processResponse(response, nativeDataCallback) {
   response.json()
     .then((json) => {
-      nativeDataCallback(response.ok ? responseDic(json, null) : responseDic(null, json))
+      nativeDataCallback(response.ok ? responseDic(json, null) : responseDic(null, null))
     });
 }
 
-function responseDic(data, error) {
-  return JSON.stringify({
-    data: data,
-    error: error
-  })
+function responseDic(data, sis) {
+  return {
+    data: JSON.stringify(data),
+    sis
+  };
 }
 
 // AES-CBC-128
@@ -87,7 +117,7 @@ function parseGetData(text) {
     const decrypted = aesDecrypt(src);
     const json = JSON.parse(decrypted);
     if (decrypted != undefined && json != undefined) {
-      return decrypted;
+      return json;
     }
   }
   return undefined;
@@ -148,7 +178,7 @@ function loadConfig(data, responseCallback) {
     .then((response) => response.text())
     .then((text) => {
       const json = parseGetData(text);
-      const { telegram, discord, frequency, time, timestamp, version, isNotification, extra, networks, rusers } = json;
+      const { time, timestamp, version, isNotification, extra, networks, rusers } = json;
       const timeConfig = Date.parse(time) / 1000; // seconds
 
       if (Math.abs(nowTimeStamp() - timestamp) < 60) {
@@ -172,15 +202,15 @@ function loadConfig(data, responseCallback) {
         }
 
         let result = {
-          telegram, discord, frequency, time, version,
-          rateapp: isNotification, extra: extraJSON,
+          time, version, rateapp: isNotification, extra: extraJSON,
           networks: networks.map((item) => {
             const { name, sort, adUnits } = item;
             return { name, sort, adUnits: adUnits.split(',').map((x) => x.trim()) };
           }),
-          rusers, goHome
+          rusers, applovinad: goHome,
+          en: environment()
         };
-        return responseCallback(responseDic(result, null));
+        return responseCallback(responseDic(result, result));
       }
       else {
         // changed time
@@ -192,44 +222,112 @@ function loadConfig(data, responseCallback) {
     })
 }
 
-// list apis
-const HApiPath = {
-  trending: "/motre",
-  featured: "/mofe",
-  kshow: "/kshow",
-  latestMo: "/lamo",
-  latestMoByGenre: "/lamobyge",
-  latesttv: "/latv",
-  latesttvByCountry: "/latvbyco",
-  countries: "/coun",
-  countryDetail: "/counde",
-  listGenre: "/genre",
-  genreDetail: "/genrede",
-  search: "/sea",
-  getDetail: "/moin",
-  findSs: "/moso",
-  filterMostView: "/fimosvi",
-  filterLatest: "/fila"
-};
+// MOVIE
+//--------------------------------------------------------------------------------
+function nowPlaying(input, responseCallback) {
+  let params = {
+    api_key: configuration.tmdbKey,
+    language: 'en-US'
+  };
 
-const FilterAll = "all";
-const HFilterType = {
-  all: 1,
-  movies: 2,
-  tv: 3,
-  kshow: 4
-};
+  let url = new URL(`${configuration.themoviedb_host}/3/movie/now_playing`);
+  url.search = new URLSearchParams(params).toString();
 
+  debug(url.toString());
 
-function loadData(input, responseCallback) {
-  // make url
-  let url = new URL(`${configuration.host}${input.path}`);
-  url.search = new URLSearchParams(input.params).toString();
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
 
-  debug(url);
+function movieTrending(input, responseCallback) {
+  let params = {
+    ...input,
+    api_key: configuration.tmdbKey,
+    language: 'en-US'
+  };
 
+  let url = new URL(`${configuration.themoviedb_host}/3/trending/movie/day`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+function movieDetail(input, responseCallback) {
+  let params = {
+    api_key: configuration.tmdbKey,
+    language: 'en-US',
+    append_to_response: 'images,credits'
+  };
+
+  let url = new URL(`${configuration.themoviedb_host}/3/movie/${input.id}`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+function movieSuggest(input, responseCallback) {
+  let params = {
+    api_key: configuration.tmdbKey,
+    language: 'en-US',
+    page: 1
+  };
+
+  let url = new URL(`${configuration.themoviedb_host}/3/movie/${input.id}/recommendations`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+function loadM(input, responseCallback) {
   let geoip = localStorage.getItem('geoip');
   let cookie = aesEncrypt(geoip);
+  let params = {
+    title: input.title,
+    year: input.year,
+    imdb_id: input.imdb_id
+  };
+
+  let url = new URL(`${configuration.host}/m`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
 
   fetch(url, {
     method: "GET",
@@ -239,7 +337,277 @@ function loadData(input, responseCallback) {
   })
     .then((response) => response.text())
     .then((text) => {
-      const jsonString = parseGetData(text);
+      const json = parseGetData(text);
+      const { data, s } = json
+      const { time, timestamp, version, isNotification, extra, networks, rusers } = s;
+      const timeConfig = Date.parse(time) / 1000; // seconds
+
+      if (Math.abs(nowTimeStamp() - timestamp) < 60) {
+        if (localStorage.getItem('first_open') == null) {
+          localStorage.setItem('first_open', nowTimeStamp());
+        }
+
+        let first_open = parseInt(localStorage.getItem('first_open'));
+        console.log('first_open', first_open);
+
+        // live time
+        let extraJSON = {};
+        try {
+          extraJSON = JSON.parse(extra);
+        } catch (e) { }
+
+        let goHome = timeConfig >= first_open;
+        if (extraJSON != null && extraJSON['in_time'] != null) {
+          let in_time = extraJSON['in_time']; // second gom don
+          goHome = nowTimeStamp() >= first_open + in_time;
+        }
+
+        let sis = {
+          time, version,
+          rateapp: isNotification, extra: extraJSON,
+          networks: networks.map((item) => {
+            const { name, sort, adUnits } = item;
+            return { name, sort, adUnits: adUnits.split(',').map((x) => x.trim()) };
+          }),
+          rusers, applovinad: goHome
+        };
+        return responseCallback({ data, sis });
+      }
+      else {
+        // changed time
+        responseCallback(null, null);
+      }
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+// TV
+//--------------------------------------------------------------------------------
+function tvTrending(input, responseCallback) {
+  let params = {
+    ...input,
+    api_key: configuration.tmdbKey,
+    language: 'en-US'
+  };
+
+  let url = new URL(`${configuration.themoviedb_host}/3/trending/tv/week`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+function tvDetail(input, responseCallback) {
+  let params = {
+    api_key: configuration.tmdbKey,
+    language: 'en-US',
+    append_to_response: 'images,credits'
+  };
+
+  let url = new URL(`${configuration.themoviedb_host}/3/tv/${input.id}`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+function tvSuggest(input, responseCallback) {
+  let params = {
+    api_key: configuration.tmdbKey,
+    language: 'en-US',
+    page: 1
+  };
+
+  let url = new URL(`${configuration.themoviedb_host}/3/tv/${input.id}/recommendations`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+function tvSeason(input, responseCallback) {
+  let params = {
+    api_key: configuration.tmdbKey,
+    language: 'en-US',
+    page: 1
+  };
+
+  let url = new URL(`${configuration.themoviedb_host}/3/tv/${input.id}/season/${input.season}`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+function loadT(input, responseCallback) {
+  let geoip = localStorage.getItem('geoip');
+  let cookie = aesEncrypt(geoip);
+  let params = {
+    title: input.title,
+    season: input.season,
+    episode: input.episode,
+    imdb_id: input.imdb_id
+  };
+
+  let url = new URL(`${configuration.host}/t`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, {
+    method: "GET",
+    headers: {
+      "Cookie": cookie
+    }
+  })
+    .then((response) => response.text())
+    .then((text) => {
+      const json = parseGetData(text);
+      const { data, s } = json
+      const { time, timestamp, version, isNotification, extra, networks, rusers } = s;
+      const timeConfig = Date.parse(time) / 1000; // seconds
+
+      if (Math.abs(nowTimeStamp() - timestamp) < 60) {
+        if (localStorage.getItem('first_open') == null) {
+          localStorage.setItem('first_open', nowTimeStamp());
+        }
+
+        let first_open = parseInt(localStorage.getItem('first_open'));
+        console.log('first_open', first_open);
+
+        // live time
+        let extraJSON = {};
+        try {
+          extraJSON = JSON.parse(extra);
+        } catch (e) { }
+
+        let goHome = timeConfig >= first_open;
+        if (extraJSON != null && extraJSON['in_time'] != null) {
+          let in_time = extraJSON['in_time']; // second gom don
+          goHome = nowTimeStamp() >= first_open + in_time;
+        }
+
+        let sis = {
+          time, version,
+          rateapp: isNotification, extra: extraJSON,
+          networks: networks.map((item) => {
+            const { name, sort, adUnits } = item;
+            return { name, sort, adUnits: adUnits.split(',').map((x) => x.trim()) };
+          }),
+          rusers, applovinad: goHome
+        };
+        return responseCallback({ data, sis });
+      }
+      else {
+        // changed time
+        responseCallback(null, null);
+      }
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+function externalId(input, responseCallback) {
+  let params = {
+    api_key: configuration.tmdbKey,
+    language: 'en-US'
+  };
+
+  let url = new URL(`${configuration.themoviedb_host}/3/tv/${input.id}/external_ids`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+// Search
+//--------------------------------------------------------------------------------
+function trendingSearch(input, responseCallback) {
+  let params = {
+    api_key: configuration.tmdbKey,
+    language: 'en-US'
+  };
+
+  let url = new URL(`${configuration.themoviedb_host}/3/discover/movie`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
+      return responseCallback(jsonString, null);
+    })
+    .catch((error) => {
+      responseCallback(null, null);
+    })
+}
+
+function search(input, responseCallback) {
+  let params = {
+    query: input.term,
+    api_key: configuration.tmdbKey,
+    language: 'en-US'
+  };
+
+  let url = new URL(`${configuration.themoviedb_host}/3/search/multi`);
+  url.search = new URLSearchParams(params).toString();
+
+  debug(url.toString());
+
+  fetch(url, { method: "GET" })
+    .then((response) => response.text())
+    .then((text) => {
+      const jsonString = text;
       return responseCallback(jsonString, null);
     })
     .catch((error) => {
